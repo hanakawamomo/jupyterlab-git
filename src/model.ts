@@ -934,6 +934,7 @@ export class GitExtension implements IGitExtension {
   /**
    * Push local changes to a remote repository.
    *
+   * @param pushConfirm - whether the push operation is confirmed, required for restricted project environment
    * @param auth - remote authentication information
    * @param force - whether or not to force the push
    * @returns promise which resolves upon pushing changes
@@ -942,7 +943,11 @@ export class GitExtension implements IGitExtension {
    * @throws {Git.GitResponseError} If the server response is not ok
    * @throws {ServerConnection.NetworkError} If the request cannot be made
    */
-  async push(auth?: Git.IAuth, force = false): Promise<Git.IResultWithMessage> {
+  async push(
+    pushConfirm?: boolean,
+    auth?: Git.IAuth,
+    force = false
+  ): Promise<Git.IResultWithMessage> {
     const path = await this._getPathRepository();
     const data = this._taskHandler.execute<Git.IResultWithMessage>(
       'git:push',
@@ -951,6 +956,7 @@ export class GitExtension implements IGitExtension {
           URLExt.join(path, 'push'),
           'POST',
           {
+            pushConfirm,
             auth: auth as any,
             force: force
           }

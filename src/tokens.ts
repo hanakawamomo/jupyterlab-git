@@ -418,6 +418,7 @@ export interface IGitExtension extends IDisposable {
   /**
    * Push local changes to a remote repository.
    *
+   * @param pushConfirm - whether the push operation is confirmed, required for restricted project environment
    * @param auth - remote authentication information
    * @param force - whether or not to force the push
    * @returns promise which resolves upon pushing changes
@@ -426,7 +427,11 @@ export interface IGitExtension extends IDisposable {
    * @throws {Git.GitResponseError} If the server response is not ok
    * @throws {ServerConnection.NetworkError} If the request cannot be made
    */
-  push(auth?: Git.IAuth, force?: boolean): Promise<Git.IResultWithMessage>;
+  push(
+    pushConfirm?: boolean,
+    auth?: Git.IAuth,
+    force?: boolean
+  ): Promise<Git.IResultWithMessage>;
 
   /**
    * General Git refresh
