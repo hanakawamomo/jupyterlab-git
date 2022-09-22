@@ -307,7 +307,6 @@ export function addCommands(
       level: Level.RUNNING,
       message: 'Pushing...'
     });
-    console.debug('hihicaviar pushing...');
     const details = await showGitOperationDialog(
       gitModel,
       args?.force ? Operation.ForcePush : Operation.Push,
@@ -334,10 +333,8 @@ export function addCommands(
     isEnabled: () => gitModel.pathRepository !== null,
     execute: async args => {
       try {
-        console.debug('hihicaviar calling gitModel.push');
         const details = await gitModel.push(false, undefined, !!args?.force);
         if (details?.message === 'show_restricted_data_warning') {
-          console.debug('hihicaviar show_restricted_data_warning');
           const result = await showDialog({
             title: 'User data in Notebook',
             body: 'Can you confirm that you notebooks do not contain data with Dropbox user file contents, Paper docs, or comments (i.e. L0 data)?',
@@ -347,15 +344,12 @@ export function addCommands(
             ]
           });
           if (result.button.label === 'Agree') {
-            console.debug('hihicaviar Agree');
             await push(args);
             return true;
           } else {
-            console.debug('hihicaviar Cancel');
             return false;
           }
         } else {
-          console.debug('hihicaviar no restricted_data_warning');
           await push(args);
         }
       } catch (error) {
