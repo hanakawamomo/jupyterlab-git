@@ -334,6 +334,7 @@ export function addCommands(
     isEnabled: () => gitModel.pathRepository !== null,
     execute: async args => {
       try {
+        console.debug('hihicaviar calling gitModel.push');
         const details = await gitModel.push(false, undefined, !!args?.force);
         if (details?.message === 'show_restricted_data_warning') {
           console.debug('hihicaviar show_restricted_data_warning');
