@@ -421,22 +421,7 @@ class Git:
                 "message": my_error,
             }
 
-        # Add attribute `is_binary`
-        command = [  # Compare stage to an empty tree see `_is_binary`
-            "git",
-            "diff",
-            "--numstat",
-            "-z",
-            "--cached",
-            "4b825dc642cb6eb9a060e54bf8d69288fbee4904",
-        ]
-        text_code, text_output, _ = await execute(command, cwd=path)
-
-        are_binary = dict()
-        if text_code == 0:
-            for line in filter(lambda l: len(l) > 0, strip_and_split(text_output)):
-                diff, name = line.rsplit("\t", maxsplit=1)
-                are_binary[name] = diff.startswith("-\t-")
+        are_binary = dict() # we only deal with notebooks. so this is ok
 
         data = {
             "code": code,
@@ -928,7 +913,7 @@ class Git:
         """
         Execute git checkout <make-branch> command & return the result.
         """
-        cmd = ["git", "checkout", "-b", branchname, startpoint]
+        cmd = ["git", "checkout", "-tb", branchname, startpoint]
         code, my_output, my_error = await execute(
             cmd,
             cwd=path,
@@ -1098,7 +1083,9 @@ class Git:
             command.append("--force-with-lease")
         if set_upstream:
             command.append("--set-upstream")
-        command.extend([remote, branch])
+            command.extend([remote, branch])
+        else:
+            command.append("origin")
 
         env = os.environ.copy()
         if auth:
