@@ -146,7 +146,7 @@ export class TagMenu extends React.Component<ITagMenuProps, ITagMenuState> {
       .tags()
       .then(response => {
         this.setState({
-          tags: response.tags
+          tags: response.tags || []
         });
       })
       .catch(error => {

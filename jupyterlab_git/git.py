@@ -158,8 +158,12 @@ async def execute(
             "Code: {}\nOutput: {}\nError: {}".format(code, log_output, log_error)
         )
     except BaseException as e:
-        code, output, error = -1, "", traceback.format_exc()
-        get_logger().warning("Fail to execute {!s}".format(cmdline), exc_info=True)
+        if len(cmdline) > 2 and cmdline[1] == "rev-parse":  # silence `git rev-parse --show-prefix` errors, they are mostly irrelevant
+            code, output, error = -1, "", str(e)
+            get_logger().warning("Fail to execute {!s}".format(cmdline))
+        else:
+            code, output, error = -1, "", traceback.format_exc()
+            get_logger().warning("Fail to execute {!s}".format(cmdline), exc_info=True)
     finally:
         execution_lock.release()
 
@@ -421,22 +425,7 @@ class Git:
                 "message": my_error,
             }
 
-        # Add attribute `is_binary`
-        command = [  # Compare stage to an empty tree see `_is_binary`
-            "git",
-            "diff",
-            "--numstat",
-            "-z",
-            "--cached",
-            "4b825dc642cb6eb9a060e54bf8d69288fbee4904",
-        ]
-        text_code, text_output, _ = await execute(command, cwd=path)
-
-        are_binary = dict()
-        if text_code == 0:
-            for line in filter(lambda l: len(l) > 0, strip_and_split(text_output)):
-                diff, name = line.rsplit("\t", maxsplit=1)
-                are_binary[name] = diff.startswith("-\t-")
+        are_binary = dict() # we only deal with notebooks. so this is ok
 
         data = {
             "code": code,
@@ -1098,7 +1087,9 @@ class Git:
             command.append("--force-with-lease")
         if set_upstream:
             command.append("--set-upstream")
-        command.extend([remote, branch])
+            command.extend([remote, branch])
+        else:
+            command.append("origin")
 
         env = os.environ.copy()
         if auth:

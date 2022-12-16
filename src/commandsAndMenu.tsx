@@ -146,11 +146,13 @@ export function addCommands(
       try {
         if (gitModel.pathRepository !== null) {
           const terminal = main.content;
+          // add a leading slash if not present (MLPPLAT-1408)
+          const repoPath = gitModel.pathRepository.startsWith('/')
+            ? gitModel.pathRepository
+            : `/${gitModel.pathRepository}`;
           terminal.session.send({
             type: 'stdin',
-            content: [
-              `cd "${gitModel.pathRepository.split('"').join('\\"')}"\n`
-            ]
+            content: [`cd "${repoPath.split('"').join('\\"')}"\n`]
           });
         }
 
@@ -302,6 +304,27 @@ export function addCommands(
     }
   });
 
+  async function push(args?: any) {
+    logger.log({
+      level: Level.RUNNING,
+      message: 'Pushing...'
+    });
+    const details = await showGitOperationDialog(
+      gitModel,
+      args?.force ? Operation.ForcePush : Operation.Push,
+      trans,
+      args,
+      undefined,
+      undefined,
+      true // pushConfirm
+    );
+    logger.log({
+      message: 'Successfully pushed',
+      level: Level.SUCCESS,
+      details
+    });
+  }
+
   /** Add git push command */
   commands.addCommand(CommandIDs.gitPush, {
     label: args =>
@@ -311,21 +334,26 @@ export function addCommands(
     caption: trans.__('Push code to remote repository'),
     isEnabled: () => gitModel.pathRepository !== null,
     execute: async args => {
-      logger.log({
-        level: Level.RUNNING,
-        message: trans.__('Pushing…')
-      });
       try {
-        const details = await showGitOperationDialog(
-          gitModel,
-          args.force ? Operation.ForcePush : Operation.Push,
-          trans
-        );
-        logger.log({
-          message: trans.__('Successfully pushed'),
-          level: Level.SUCCESS,
-          details
-        });
+        const details = await gitModel.push(false, undefined, !!args?.force);
+        if (details?.message === 'show_restricted_data_warning') {
+          const result = await showDialog({
+            title: 'User data in Notebook',
+            body: 'Can you confirm that you notebooks do not contain data with Dropbox user file contents, Paper docs, or comments (i.e. L0 data)?',
+            buttons: [
+              Dialog.okButton({ accept: true, label: 'Agree' }),
+              Dialog.cancelButton()
+            ]
+          });
+          if (result.button.label === 'Agree') {
+            await push(args);
+            return true;
+          } else {
+            return false;
+          }
+        } else {
+          await push(args);
+        }
       } catch (error) {
         console.error(
           trans.__('Encountered an error when pushing changes. Error: '),
@@ -1421,6 +1449,7 @@ export function addFileBrowserContextMenu(
  * @param args - Git operation arguments
  * @param authentication - Git authentication information
  * @param retry - Is this operation retried?
+ * @param pushConfirm - For push operation in restricted project environment, has the user confirmed?
  * @returns Promise for displaying a dialog
  */
 export async function showGitOperationDialog<T>(
@@ -1429,7 +1458,8 @@ export async function showGitOperationDialog<T>(
   trans: TranslationBundle,
   args?: T,
   authentication?: Git.IAuth,
-  retry = false
+  retry = false,
+  pushConfirm = false
 ): Promise<string> {
   try {
     let result: Git.IResultWithMessage;
@@ -1444,10 +1474,10 @@ export async function showGitOperationDialog<T>(
         result = await model.pull(authentication);
         break;
       case Operation.Push:
-        result = await model.push(authentication);
+        result = await model.push(pushConfirm, authentication);
         break;
       case Operation.ForcePush:
-        result = await model.push(authentication, true);
+        result = await model.push(pushConfirm, authentication, true);
         break;
       case Operation.Fetch:
         result = await model.fetch(authentication);

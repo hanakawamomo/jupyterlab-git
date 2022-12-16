@@ -173,14 +173,10 @@ class GitFetchHandler(GitHandler):
         """
         POST request handler, fetch from remotes.
         """
-        data = self.get_json_body()
-        result = await self.git.fetch(
-            self.url2localpath(path),
-            data.get("auth", None),
-        )
-
-        if result["code"] != 0:
-            self.set_status(500)
+        self.set_status(200)
+        result = {
+            "code": 0, # send success code
+        }
         self.finish(json.dumps(result))
 
 
@@ -557,6 +553,9 @@ class GitPullHandler(GitHandler):
         self.finish(json.dumps(response))
 
 
+def isRestrictedProject():
+    return os.environ.get("ML_PROJECT") not in ["GENERAL", "ml-users"]
+
 class GitPushHandler(GitHandler):
     """
     Handler for 'git push <first-branch> <second-branch>.
@@ -579,74 +578,82 @@ class GitPushHandler(GitHandler):
         data = self.get_json_body()
         known_remote = data.get("remote")
         force = data.get("force", False)
+        pushConfirm = data.get("pushConfirm")
 
-        current_local_branch = await self.git.get_current_branch(local_path)
-
-        set_upstream = False
-        current_upstream_branch = await self.git.get_upstream_branch(
-            local_path, current_local_branch
-        )
-
-        if known_remote is not None:
-            set_upstream = current_upstream_branch["code"] != 0
-
-            remote_name, _, remote_branch = known_remote.partition("/")
-
-            current_upstream_branch = {
+        if not pushConfirm:
+            response = {
                 "code": 0,
-                "remote_branch": remote_branch or current_local_branch,
-                "remote_short_name": remote_name,
+                "message": "show_restricted_data_warning" if isRestrictedProject() else ""
             }
+            self.finish(json.dumps(response))
+        else:
+            current_local_branch = await self.git.get_current_branch(local_path)
 
-        if current_upstream_branch["code"] == 0:
-            branch = ":".join(["HEAD", current_upstream_branch["remote_branch"]])
-            response = await self.git.push(
-                current_upstream_branch["remote_short_name"],
-                branch,
-                local_path,
-                data.get("auth", None),
-                set_upstream,
-                force,
+            set_upstream = False
+            current_upstream_branch = await self.git.get_upstream_branch(
+                local_path, current_local_branch
             )
 
-        else:
-            # Allow users to specify upstream through their configuration
-            # https://git-scm.com/docs/git-config#Documentation/git-config.txt-pushdefault
-            # Or use the remote defined if only one remote exists
-            config = await self.git.config(local_path)
-            config_options = config["options"]
-            list_remotes = await self.git.remote_show(local_path)
-            remotes = list_remotes.get("remotes", list())
-            push_default = config_options.get("remote.pushdefault")
+            if known_remote is not None:
+                set_upstream = current_upstream_branch["code"] != 0
 
-            default_remote = None
-            if push_default is not None and push_default in remotes:
-                default_remote = push_default
-            elif len(remotes) == 1:
-                default_remote = remotes[0]
+                remote_name, _, remote_branch = known_remote.partition("/")
 
-            if default_remote is not None:
-                response = await self.git.push(
-                    default_remote,
-                    current_local_branch,
-                    local_path,
-                    data.get("auth", None),
-                    set_upstream=True,
-                    force=force,
-                )
-            else:
-                response = {
-                    "code": 128,
-                    "message": "fatal: The current branch {} has no upstream branch.".format(
-                        current_local_branch
-                    ),
-                    "remotes": remotes,  # Returns the list of known remotes
+                current_upstream_branch = {
+                    "code": 0,
+                    "remote_branch": remote_branch or current_local_branch,
+                    "remote_short_name": remote_name,
                 }
 
-        if response["code"] != 0:
-            self.set_status(500)
+            if current_upstream_branch["code"] == 0:
+                branch = ":".join(["HEAD", current_upstream_branch["remote_branch"]])
+                response = await self.git.push(
+                    current_upstream_branch["remote_short_name"],
+                    branch,
+                    local_path,
+                    data.get("auth", None),
+                    set_upstream,
+                    force,
+                )
 
-        self.finish(json.dumps(response))
+            else:
+                # Allow users to specify upstream through their configuration
+                # https://git-scm.com/docs/git-config#Documentation/git-config.txt-pushdefault
+                # Or use the remote defined if only one remote exists
+                config = await self.git.config(local_path)
+                config_options = config["options"]
+                list_remotes = await self.git.remote_show(local_path)
+                remotes = list_remotes.get("remotes", list())
+                push_default = config_options.get("remote.pushdefault")
+
+                default_remote = None
+                if push_default is not None and push_default in remotes:
+                    default_remote = push_default
+                elif len(remotes) == 1:
+                    default_remote = remotes[0]
+
+                if default_remote is not None:
+                    response = await self.git.push(
+                        default_remote,
+                        current_local_branch,
+                        local_path,
+                        data.get("auth", None),
+                        set_upstream=True,
+                        force=force,
+                    )
+                else:
+                    response = {
+                        "code": 128,
+                        "message": "fatal: The current branch {} has no upstream branch.".format(
+                            current_local_branch
+                        ),
+                        "remotes": remotes,  # Returns the list of known remotes
+                    }
+
+            if response["code"] != 0:
+                self.set_status(500)
+
+            self.finish(json.dumps(response))
 
 
 class GitInitHandler(GitHandler):
@@ -817,10 +824,10 @@ class GitTagHandler(GitHandler):
         """
         POST request handler, fetches all tags in current repository.
         """
-        result = await self.git.tags(self.url2localpath(path))
-
-        if result["code"] != 0:
-            self.set_status(500)
+        self.set_status(200)
+        result = {
+            "code": 0, # send success code
+        }
         self.finish(json.dumps(result))
 
 
